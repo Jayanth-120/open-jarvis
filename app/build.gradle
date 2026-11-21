@@ -84,4 +84,5 @@ dependencies {
 
     debugImplementation 'androidx.compose.ui:ui-tooling'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
+    Keep version 2.2.1—newer 4.x releases require Android SDK 37 and AGP 9.4+, whereas open-jarvis uses standard Android Views for its floating overlay.
 }
