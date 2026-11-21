@@ -6,11 +6,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 object VoidColor {
+    val Void950 = Color(0xFF06060A)
     val Void900 = Color(0xFF0A0A0F)
     val Void800 = Color(0xFF12121B)
     val Void700 = Color(0xFF1A1A26)
     val Void600 = Color(0xFF2A2A3B)
     val BorderSubtle = Color(0xFF2E2E42)
+    val BorderGlow = Color(0xFF8B5CF6)
     val Violet = Color(0xFF8B5CF6)
     val VioletDim = Color(0xFF4C1D95)
     val Cyan = Color(0xFF22D3EE)
