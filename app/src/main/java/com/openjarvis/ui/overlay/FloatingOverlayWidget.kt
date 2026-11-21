@@ -608,6 +608,325 @@ private fun TaskLogWidget(tasks: List<TaskNode>) {
                         .height(32.dp)
                         .padding(horizontal = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
+                   color = VoidColor.TextPrimary
+                            )
+                        )
+                    }
+
+                    IconButton(onClick = onCollapse) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Collapse",
+                            tint = VoidColor.TextDisabled
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                StatusLine(state = agentState, stepText = stepText)
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                DividerLine()
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (suggestions.isNotEmpty() && agentState is AgentState.Idle) {
+                    SuggestionChips(
+                        suggestions = suggestions,
+                        onSuggestionClick = onSuggestionClick
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                InputRowWithVoice(
+                    commandText = commandText,
+                    onCommandTextChange = onCommandTextChange,
+                    placeholderText = if (commandText.isEmpty()) placeholderText else "",
+                    voiceState = voiceState,
+                    onVoicePressStart = onVoicePressStart,
+                    onVoicePressEnd = onVoicePressEnd,
+                    onSend = onSend
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                DividerLine()
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                TaskLogWidget(tasks = recentTasks.take(3))
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusOrb(state: AgentState) {
+    val infiniteTransition = rememberInfiniteTransition(label = "orb")
+
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 0.7f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "orb_scale"
+    )
+
+    val color = when (state) {
+        is AgentState.Idle -> VoidColor.Violet
+        is AgentState.Running -> VoidColor.Cyan
+        is AgentState.Done -> VoidColor.Green
+        is AgentState.Error -> VoidColor.Red
+    }
+
+    Box(
+        modifier = Modifier
+            .size(8.dp)
+            .scale(scale),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawCircle(color = color)
+        }
+    }
+}
+
+@Composable
+private fun StatusLine(state: AgentState, stepText: String) {
+    val cursorAlpha by rememberInfiniteTransition(label = "cursor").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "cursor_alpha"
+    )
+
+    val textColor = when (state) {
+        is AgentState.Idle -> VoidColor.TextDisabled
+        is AgentState.Running -> VoidColor.Cyan
+        is AgentState.Done -> VoidColor.Green
+        is AgentState.Error -> VoidColor.Red
+    }
+
+    Row(
+        modifier = Modifier.height(28.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = when (state) {
+                is AgentState.Idle -> "_ ready for command"
+                is AgentState.Running -> "◉ $stepText"
+                is AgentState.Done -> "✓ done in $stepText"
+                is AgentState.Error -> "✗ $stepText"
+                else -> ""
+            },
+            style = TextStyle(
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp,
+                color = textColor
+            )
+        )
+
+        if (state is AgentState.Idle) {
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .height(12.dp)
+                    .background(VoidColor.TextDisabled.copy(alpha = cursorAlpha))
+            )
+        }
+    }
+}
+
+@Composable
+private fun InputRowWithVoice(
+    commandText: String,
+    onCommandTextChange: (String) -> Unit,
+    placeholderText: String,
+    voiceState: VoiceState,
+    onVoicePressStart: () -> Unit,
+    onVoicePressEnd: () -> Unit,
+    onSend: () -> Unit
+) {
+    val isRecording = voiceState is VoiceState.Recording
+    val isTranscribing = voiceState is VoiceState.Transcribing
+
+    val scale by animateFloatAsState(
+        targetValue = if (isRecording) 1.15f else 1f,
+        animationSpec = spring(stiffness = 400f, dampingRatio = 0.5f),
+        label = "mic_scale"
+    )
+
+    val glowAlpha by animateFloatAsState(
+        targetValue = if (isRecording) 0.6f else 0f,
+        animationSpec = tween(200),
+        label = "mic_glow"
+    )
+
+    val bgColor by animateColorAsState(
+        targetValue = when {
+            isRecording -> VoidColor.Red
+            isTranscribing -> VoidColor.Amber
+            else -> VoidColor.Void700
+        },
+        animationSpec = tween(200),
+        label = "mic_bg"
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .scale(scale)
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = {
+                            onVoicePressStart()
+                            tryAwaitRelease()
+                            onVoicePressEnd()
+                        }
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            if (glowAlpha > 0f) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            color = VoidColor.Red.copy(alpha = glowAlpha * 0.3f),
+                            shape = CircleShape
+                        )
+                )
+            }
+
+            Surface(
+                shape = CircleShape,
+                color = bgColor,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Voice input",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .size(18.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Text(
+            text = "›",
+            style = TextStyle(
+                fontFamily = FontFamily.Monospace,
+                fontSize = 18.sp,
+                color = VoidColor.Violet
+            )
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        BasicTextField(
+            value = commandText,
+            onValueChange = onCommandTextChange,
+            modifier = Modifier.weight(1f),
+            textStyle = TextStyle(
+                fontFamily = FontFamily.Monospace,
+                fontSize = 14.sp,
+                color = VoidColor.TextPrimary
+            ),
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.None,
+                autoCorrect = false,
+                keyboardType = KeyboardType.Text,
+                imeAction = ImeAction.Send
+            ),
+            keyboardActions = KeyboardActions(onSend = { onSend() }),
+            decorationBox = { innerTextField ->
+                Box {
+                    if (commandText.isEmpty()) {
+                        Text(
+                            text = placeholderText,
+                            style = TextStyle(
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 14.sp,
+                                color = VoidColor.TextDisabled.copy(alpha = 0.5f)
+                            )
+                        )
+                    }
+                    innerTextField()
+                }
+            }
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        val sendButtonColor = if (commandText.isEmpty()) VoidColor.Void700 else VoidColor.Violet
+
+        Surface(
+            modifier = Modifier.size(36.dp),
+            shape = RoundedCornerShape(8.dp),
+            color = sendButtonColor,
+            onClick = onSend
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowUp,
+                    contentDescription = "Send",
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DividerLine() {
+    Divider(
+        modifier = Modifier.fillMaxWidth(),
+        thickness = 1.dp,
+        color = VoidColor.Void600
+    )
+}
+
+@Composable
+private fun TaskLogWidget(tasks: List<TaskNode>) {
+    Column(modifier = Modifier.heightIn(max = 80.dp)) {
+        tasks.forEachIndexed { index, task ->
+            var visible by remember { mutableStateOf(false) }
+
+            LaunchedEffect(Unit) {
+                delay((index * 80).toLong())
+                visible = true
+            }
+
+            AnimatedVisibility(
+                visible = visible,
+                enter = slideInVertically { -24 } + fadeIn()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(32.dp)
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                apContentHeight(),
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
         color = VoidColor.Void900,
