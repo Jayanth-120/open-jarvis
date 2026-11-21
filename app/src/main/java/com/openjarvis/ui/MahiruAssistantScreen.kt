@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -70,7 +71,9 @@ fun MahiruAssistantScreen(
     onStopVoice: () -> Unit,
     onOpenSettings: () -> Unit,
     alerts: List<com.openjarvis.intelligence.JarvisNotificationListener.JarvisNotification>,
-    onNotificationAccess: () -> Unit
+    onNotificationAccess: () -> Unit,
+    wakeWordEnabled: Boolean,
+    onWakeWordToggle: (Boolean) -> Unit
 ) {
     var command by remember { mutableStateOf("") }
     val listening = voiceState is VoiceManager.VoiceState.Recording ||
@@ -137,6 +140,19 @@ fun MahiruAssistantScreen(
                 IconButton(onClick = onNotificationAccess) {
                     Icon(Icons.Default.NotificationsActive, contentDescription = "Notification access", tint = VoidColor.Cyan)
                 }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
+            ) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(if (wakeWordEnabled) "WAKE WORD ON" else "TAP TO TALK", color = if (wakeWordEnabled) VoidColor.Cyan else VoidColor.TextSecondary, fontSize = 10.sp, letterSpacing = 1.2.sp)
+                    Text(if (wakeWordEnabled) "Say “Mahiru” anytime" else "Background mic is off", color = VoidColor.TextDisabled, fontSize = 9.sp)
+                }
+                Spacer(Modifier.size(8.dp))
+                Switch(checked = wakeWordEnabled, onCheckedChange = onWakeWordToggle)
             }
 
             Box(

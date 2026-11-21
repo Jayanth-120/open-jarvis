@@ -38,6 +38,8 @@ import com.openjarvis.agent.AgentState
 import com.openjarvis.intelligence.JarvisNotificationListener
 import com.openjarvis.ui.theme.VoidColor
 import com.openjarvis.ui.theme.OpenJarvisTheme
+import com.openjarvis.voice.MahiruWakeWordService
+import com.openjarvis.voice.MahiruWakeWordStatus
 import com.openjarvis.voice.VoiceManager
 
 class MainActivity : ComponentActivity() {
@@ -45,9 +47,14 @@ class MainActivity : ComponentActivity() {
     private lateinit var agentCore: AgentCore
     private lateinit var voiceManager: VoiceManager
     private var accessibilityAllowed by mutableStateOf(false)
+    private var wakeWordEnabled by mutableStateOf(false)
+    private var pendingWakeWordPermission = false
 
     private val requestMicrophone = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) startVoiceInput()
+        val wasWakeWordRequest = pendingWakeWordPermission
+        pendingWakeWordPermission = false
+        if (granted && wasWakeWordRequest) enableWakeWord()
+        else if (granted) startVoiceInput()
         else Toast.makeText(this, "Microphone permission is needed for voice chat.", Toast.LENGTH_LONG).show()
     }
 
@@ -63,12 +70,17 @@ class MainActivity : ComponentActivity() {
         agentCore = AgentCore(this)
         voiceManager = VoiceManager(this)
         accessibilityAllowed = isAccessibilityServiceEnabled()
+        wakeWordEnabled = getSharedPreferences("assistant_modes", MODE_PRIVATE).getBoolean("wake_word_enabled", false)
+        if (wakeWordEnabled && ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            startWakeWordService()
+        }
 
         setContent {
             OpenJarvisTheme {
                 val agentState by agentCore.state.collectAsState()
                 val voiceState by voiceManager.state.collectAsState()
                 val alerts by JarvisNotificationListener.alerts.collectAsState()
+                val wakeWordActive by MahiruWakeWordStatus.active.collectAsState()
 
                 LaunchedEffect(voiceState) {
                     val result = voiceState as? VoiceManager.VoiceState.Result
@@ -95,7 +107,9 @@ class MainActivity : ComponentActivity() {
                         onStopVoice = { voiceManager.stopListening() },
                         onOpenSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
                         alerts = alerts,
-                        onNotificationAccess = { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+                        onNotificationAccess = { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) },
+                        wakeWordEnabled = wakeWordActive,
+                        onWakeWordToggle = ::setWakeWordEnabled
                     )
                 }
             }
@@ -126,6 +140,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestVoiceInput() {
+        if (wakeWordEnabled) disableWakeWord()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             startVoiceInput()
         } else {
@@ -136,6 +151,36 @@ class MainActivity : ComponentActivity() {
     private fun startVoiceInput() {
         voiceManager.setVoiceEnabled(true)
         voiceManager.startListening()
+    }
+
+    private fun setWakeWordEnabled(enabled: Boolean) {
+        if (!enabled) {
+            disableWakeWord()
+            return
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            enableWakeWord()
+        } else {
+            pendingWakeWordPermission = true
+            requestMicrophone.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun enableWakeWord() {
+        wakeWordEnabled = true
+        getSharedPreferences("assistant_modes", MODE_PRIVATE).edit().putBoolean("wake_word_enabled", true).apply()
+        startWakeWordService()
+    }
+
+    private fun startWakeWordService() {
+        val intent = Intent(this, MahiruWakeWordService::class.java).setAction(MahiruWakeWordService.ACTION_START)
+        ContextCompat.startForegroundService(this, intent)
+    }
+
+    private fun disableWakeWord() {
+        wakeWordEnabled = false
+        getSharedPreferences("assistant_modes", MODE_PRIVATE).edit().putBoolean("wake_word_enabled", false).apply()
+        stopService(Intent(this, MahiruWakeWordService::class.java))
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
