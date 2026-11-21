@@ -11,15 +11,15 @@ import kotlin.math.abs
 
 class MahiruAvatarView(
     context: Context,
-    private var onAvatarTapped: () -> Unit
+    private val onAvatarTapped: () -> Unit
 ) : FrameLayout(context) {
 
     private var downX = 0f
     private var downY = 0f
 
-    private val sceneView = SceneView(context).apply {
+        private val sceneView = SceneView(context).apply {
         setBackgroundColor(Color.TRANSPARENT)
-        isOpaque = false
+        setZOrderOnTop(true)
     }
 
     init {
