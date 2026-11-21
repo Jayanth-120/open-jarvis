@@ -33,9 +33,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.openjarvis.graphify.GraphifyRepository
 import com.openjarvis.graphify.nodes.AppNode
 import com.openjarvis.graphify.nodes.TaskNode
+import com.openjarvis.ui.MahiruAvatarView
 import com.openjarvis.ui.theme.VoidColor
 import kotlinx.coroutines.delay
 
@@ -91,6 +93,10 @@ fun DashboardScreen(
             
             HeroSection(isSystemActive = isSystemActive)
             
+            Spacer(modifier = Modifier.height(16.dp))
+
+            MahiruAssistantCard(onActivate = onStartOverlay)
+
             Spacer(modifier = Modifier.height(16.dp))
             
             StatsRow(tasks = recentTasks, alpha = statsAlpha)
@@ -153,7 +159,7 @@ private fun HeroSection(isSystemActive: Boolean) {
             border = androidx.compose.foundation.BorderStroke(1.dp, VoidColor.BorderGlow)
         ) {
             Text(
-                text = "AI AGENT v0.1",
+                text = "MAHIRU AI COMPANION",
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
                     fontWeight = FontWeight(500),
@@ -169,7 +175,7 @@ private fun HeroSection(isSystemActive: Boolean) {
         
         val annotatedText = buildAnnotatedString {
             withStyle(androidx.compose.ui.text.SpanStyle(color = VoidColor.TextPrimary)) {
-                append("OPEN")
+                append("MAHIRU")
             }
             append(" ")
             withStyle(androidx.compose.ui.text.SpanStyle(
@@ -177,7 +183,7 @@ private fun HeroSection(isSystemActive: Boolean) {
                     colors = listOf(VoidColor.Violet, VoidColor.Cyan)
                 )
             )) {
-                append("JARVIS")
+                append("SHIINA")
             }
         }
         
@@ -192,7 +198,7 @@ private fun HeroSection(isSystemActive: Boolean) {
         )
         
         Text(
-            text = "Your device. Your commands.",
+            text = "Your device. Your companion.",
             style = TextStyle(
                 fontFamily = FontFamily.Default,
                 fontWeight = FontWeight(400),
@@ -641,5 +647,34 @@ private fun formatRelativeTime(timestamp: Long): String {
         minutes < 1 -> "now"
         minutes < 60 -> "${minutes}m"
         else -> "${minutes / 60}h"
+    }
+}
+
+@Composable
+private fun MahiruAssistantCard(onActivate: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = VoidColor.Void900,
+        border = androidx.compose.foundation.BorderStroke(1.dp, VoidColor.BorderSubtle)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AndroidView(
+                factory = { context -> MahiruAvatarView(context, onAvatarTapped = onActivate) },
+                onRelease = { it.destroy() },
+                modifier = Modifier.size(width = 124.dp, height = 164.dp)
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("MAHIRU SHIINA", color = VoidColor.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Spacer(Modifier.height(6.dp))
+                Text("Your AI companion is ready", color = VoidColor.TextSecondary, fontSize = 12.sp)
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = onActivate) { Text("Open Mahiru") }
+            }
+        }
     }
 }

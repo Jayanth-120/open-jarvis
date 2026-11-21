@@ -32,6 +32,10 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import com.openjarvis.llm.UniversalAdapter
 import com.openjarvis.ui.theme.VoidColor
 
@@ -39,12 +43,19 @@ import com.openjarvis.ui.theme.VoidColor
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onSaveProvider: (String, String, String, String) -> Unit,
+    initialProvider: String = "Groq",
+    initialBaseUrl: String = "",
+    initialApiKey: String = "",
+    initialModel: String = "llama-3.1-70b-versatile",
+    accessibilityEnabled: Boolean = false,
+    overlayEnabled: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    var selectedProvider by remember { mutableStateOf("Groq") }
-    var baseUrl by remember { mutableStateOf("") }
-    var apiKey by remember { mutableStateOf("") }
-    var model by remember { mutableStateOf("llama-3.1-70b-versatile") }
+    var selectedProvider by remember { mutableStateOf(initialProvider) }
+    var baseUrl by remember { mutableStateOf(initialBaseUrl) }
+    var apiKey by remember { mutableStateOf(initialApiKey) }
+    var model by remember { mutableStateOf(initialModel) }
+    val context = LocalContext.current
     var showBaseUrlField by remember { mutableStateOf(false) }
     var showProvidersDropdown by remember { mutableStateOf(false) }
     var showPassword by remember { mutableStateOf(false) }
@@ -132,7 +143,8 @@ fun SettingsScreen(
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 
-                TestConnectionButton(
+                SaveProviderButton(
+                    provider = selectedProvider,
                     apiKey = apiKey,
                     baseUrl = baseUrl,
                     model = model,
@@ -280,14 +292,20 @@ fun SettingsScreen(
                 
                 PermissionRow(
                     title = "Accessibility",
-                    subtitle = "Required — Tap to enable"
+                    enabled = accessibilityEnabled,
+                    onClick = { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
                 )
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 PermissionRow(
                     title = "Overlay",
-                    subtitle = "Required — Tap to enable"
+                    enabled = overlayEnabled,
+                    onClick = {
+                        context.startActivity(
+                            Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
+                        )
+                    }
                 )
                 
                 Spacer(modifier = Modifier.height(32.dp))
@@ -577,7 +595,8 @@ fun FloatingLabelTextField(
 }
 
 @Composable
-private fun TestConnectionButton(
+private fun SaveProviderButton(
+    provider: String,
     apiKey: String,
     baseUrl: String,
     model: String,
@@ -605,8 +624,8 @@ private fun TestConnectionButton(
     
     OutlinedButton(
         onClick = {
-            onSave("Groq", baseUrl, apiKey, model)
-            testState = TestState.Success(150)
+            onSave(provider, baseUrl, apiKey, model)
+            testState = TestState.Success(0)
         },
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -616,7 +635,7 @@ private fun TestConnectionButton(
         )
     ) {
         when (val state = testState) {
-            is TestState.Idle -> Text("Test Connection")
+            is TestState.Idle -> Text("Save API Settings")
             is TestState.Loading -> CircularProgressIndicator(
                 modifier = Modifier.size(16.dp),
                 strokeWidth = 2.dp,
@@ -625,7 +644,7 @@ private fun TestConnectionButton(
             is TestState.Success -> {
                 Icon(Icons.Default.Check, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Connected — ${state.ms}ms")
+                Text("Settings saved")
             }
             is TestState.Error -> {
                 Text("Failed — check key")
@@ -714,14 +733,14 @@ private fun SettingsToggleRow(
 @Composable
 private fun PermissionRow(
     title: String,
-    subtitle: String
+    enabled: Boolean,
+    onClick: () -> Unit
 ) {
-    val isGranted by remember { mutableStateOf(false) }
-    
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(64.dp),
+            .height(64.dp)
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         color = VoidColor.Void900,
         border = BorderStroke(1.dp, VoidColor.BorderSubtle)
@@ -736,13 +755,13 @@ private fun PermissionRow(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(VoidColor.Red.copy(alpha = 0.12f)),
+                    .background((if (enabled) VoidColor.Green else VoidColor.Red).copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
-                    tint = VoidColor.Red,
+                    tint = if (enabled) VoidColor.Green else VoidColor.Red,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -760,12 +779,12 @@ private fun PermissionRow(
                     )
                 )
                 Text(
-                    text = subtitle,
+                    text = if (enabled) "Allowed" else "Required — Tap to enable",
                     style = TextStyle(
                         fontFamily = FontFamily.Default,
                         fontWeight = FontWeight(400),
                         fontSize = 11.sp,
-                        color = VoidColor.Red
+                        color = if (enabled) VoidColor.Green else VoidColor.Red
                     )
                 )
             }
@@ -773,7 +792,7 @@ private fun PermissionRow(
             Icon(
                 imageVector = Icons.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = VoidColor.Red
+                tint = if (enabled) VoidColor.Green else VoidColor.Red
             )
         }
     }

@@ -40,6 +40,8 @@ import com.openjarvis.ui.theme.VoidColor
 class MainActivity : ComponentActivity() {
 
     private lateinit var graphifyRepo: GraphifyRepository
+    private var accessibilityAllowed by mutableStateOf(false)
+    private var overlayAllowed by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,8 +62,8 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                val accessibilityEnabled = isAccessibilityServiceEnabled()
-                val overlayEnabled = Settings.canDrawOverlays(this)
+                val accessibilityEnabled = accessibilityAllowed
+                val overlayEnabled = overlayAllowed
 
                 if (!accessibilityEnabled || !overlayEnabled) {
                     PermissionScreen(
@@ -82,14 +84,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        accessibilityAllowed = isAccessibilityServiceEnabled()
+        overlayAllowed = Settings.canDrawOverlays(this)
+    }
+
     private fun isAccessibilityServiceEnabled(): Boolean {
         val enabledServices = Settings.Secure.getString(
             contentResolver,
             Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
         ) ?: return false
 
-        val componentName = ComponentName(this, JarvisAccessibilityService::class.java)
-        return enabledServices.contains(componentName.flattenToString())
+        val expected = ComponentName(this, JarvisAccessibilityService::class.java)
+        return enabledServices.split(':').any { ComponentName.unflattenFromString(it) == expected }
     }
 
     private fun startAccessibilitySettings() {
