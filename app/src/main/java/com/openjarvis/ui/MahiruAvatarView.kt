@@ -7,11 +7,15 @@ import android.widget.FrameLayout
 import io.github.sceneview.SceneView
 import io.github.sceneview.math.Position
 import io.github.sceneview.node.ModelNode
+import kotlin.math.abs
 
-class MahiroAvatarView(
+class MahiruAvatarView(
     context: Context,
     private val onAvatarTapped: () -> Unit
 ) : FrameLayout(context) {
+
+    private var downX = 0f
+    private var downY = 0f
 
     private val sceneView = SceneView(context).apply {
         setBackgroundColor(Color.TRANSPARENT)
@@ -36,8 +40,18 @@ class MahiroAvatarView(
     }
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
-        if (ev.action == MotionEvent.ACTION_UP) {
-            onAvatarTapped()
+        when (ev.action) {
+            MotionEvent.ACTION_DOWN -> {
+                downX = ev.x
+                downY = ev.y
+            }
+            MotionEvent.ACTION_UP -> {
+                val movedX = abs(ev.x - downX)
+                val movedY = abs(ev.y - downY)
+                if (movedX < 15f && movedY < 15f) {
+                    onAvatarTapped()
+                }
+            }
         }
         return false
     }
