@@ -11,7 +11,7 @@ import kotlin.math.abs
 
 class MahiruAvatarView(
     context: Context,
-    private val onAvatarTapped: () -> Unit
+    private var onAvatarTapped: () -> Unit
 ) : FrameLayout(context) {
 
     private var downX = 0f
