@@ -1,4 +1,4 @@
-package com.openjarvis.ui.overlay
+package com.openjarvis.ui.MahiroAvatarView
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
