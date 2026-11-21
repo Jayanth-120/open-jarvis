@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Open Jarvis</string>
+    <string name="app_name">Mahiru</string>
     <string name="accessibility_description">Open Jarvis uses accessibility to control your apps and perform actions on your device. This service is required for the AI agent to tap, type, and navigate apps.</string>
     <string name="accessibility_service_label">Open Jarvis</string>
     <string name="notification_channel_name">Jarvis Assistant</string>
