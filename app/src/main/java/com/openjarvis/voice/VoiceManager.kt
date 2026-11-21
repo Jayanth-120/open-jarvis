@@ -50,7 +50,10 @@ class VoiceManager(private val context: Context) {
     }
 
     init {
-        // Apply saved settings
+        ttsEngine.setSpeechRate(getSpeechRate())
+    }
+
+    fun initialize() {
         ttsEngine.setSpeechRate(getSpeechRate())
     }
 
@@ -64,7 +67,7 @@ class VoiceManager(private val context: Context) {
         val mode = prefs.getString(KEY_STT_MODE, STTMode.PUSH_TO_TALK.name)
         return try {
             STTMode.valueOf(mode ?: STTMode.PUSH_TO_TALK.name)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             STTMode.PUSH_TO_TALK
         }
     }
@@ -86,7 +89,6 @@ class VoiceManager(private val context: Context) {
         ttsEngine.setSpeechRate(rate)
     }
 
-    // Push-to-talk mode
     fun startListening() {
         if (!isVoiceEnabled()) {
             _state.value = VoiceState.Error("Voice disabled in settings")
@@ -124,7 +126,12 @@ class VoiceManager(private val context: Context) {
         return text
     }
 
-    // Auto VAD mode
+    fun cancel() {
+        sttEngine.stop()
+        ttsEngine.stop()
+        _state.value = VoiceState.Idle
+    }
+
     fun startListeningWithVAD() {
         if (!isVoiceEnabled()) {
             _state.value = VoiceState.Error("Voice disabled in settings")
@@ -135,7 +142,6 @@ class VoiceManager(private val context: Context) {
             _state.value = VoiceState.Recording
             _state.value = VoiceState.Transcribing
 
-            // For now, use simple push-to-talk with Android's built-in VAD
             sttEngine.startListening(
                 onResult = { text ->
                     if (!text.isNullOrBlank()) {
