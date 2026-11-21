@@ -127,10 +127,11 @@ class VoiceManager(private val context: Context) {
     }
 
     fun cancel() {
-        sttEngine.stop()
-        ttsEngine.stop()
-        _state.value = VoiceState.Idle
-    }
+    sttEngine.stop()
+    ttsEngine.stop()
+    _state.value = VoiceState.Idle
+}
+
 
     fun startListeningWithVAD() {
         if (!isVoiceEnabled()) {
