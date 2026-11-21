@@ -13,8 +13,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
@@ -94,19 +94,41 @@ fun FloatingOverlayWidget(
                         stiffness = 260f,
                         dampingRatio = 0.8f
                     )
-                ) + fadeIn(animationSpec = tween(150, delayMillis = 240)))
+                ) + fadeIn(animationSpec = tween(150, delayMillis = 240))) togetherWith
+                    (shrinkHorizontally(
+                        animationSpec = spring(
+                            stiffness = Spring.StiffnessMedium,
+                            dampingRatio = 0.8f
+                        )
+                    ) + shrinkVertically(
+                        animationSpec = spring(
+                            stiffness = Spring.StiffnessMedium,
+                            dampingRatio = 0.8f
+                        )
+                    ) + fadeOut(animationSpec = tween(100)))
             } else {
-                (shrinkHorizontally(
+                (expandHorizontally(
                     animationSpec = spring(
                         stiffness = Spring.StiffnessMedium,
                         dampingRatio = 0.8f
                     )
-                ) + shrinkVertically(
+                ) + expandVertically(
                     animationSpec = spring(
-                        stiffness = Spring.StiffnessMedium,
+                        stiffness = 260f,
                         dampingRatio = 0.8f
                     )
-                ) + fadeOut(animationSpec = tween(100)))
+                ) + fadeIn(animationSpec = tween(150))) togetherWith
+                    (shrinkHorizontally(
+                        animationSpec = spring(
+                            stiffness = Spring.StiffnessMedium,
+                            dampingRatio = 0.8f
+                        )
+                    ) + shrinkVertically(
+                        animationSpec = spring(
+                            stiffness = Spring.StiffnessMedium,
+                            dampingRatio = 0.8f
+                        )
+                    ) + fadeOut(animationSpec = tween(100)))
             }
         },
         label = "overlay_expand"
@@ -338,369 +360,6 @@ private fun ExpandedOverlay(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 TaskLogWidget(tasks = recentTasks.take(3))
-            }
-        }
-    }
-}
-
-@Composable
-private fun StatusOrb(state: AgentState) {
-    val infiniteTransition = rememberInfiniteTransition(label = "orb")
-
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 0.7f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "orb_scale"
-    )
-
-    val color = when (state) {
-        is AgentState.Idle -> VoidColor.Violet
-        is AgentState.Running -> VoidColor.Cyan
-        is AgentState.Done -> VoidColor.Green
-        is AgentState.Error -> VoidColor.Red
-    }
-
-    Box(
-        modifier = Modifier
-            .size(8.dp)
-            .scale(scale),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawCircle(color = color)
-        }
-    }
-}
-
-@Composable
-private fun StatusLine(state: AgentState, stepText: String) {
-    val cursorAlpha by rememberInfiniteTransition(label = "cursor").animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "cursor_alpha"
-    )
-
-    val textColor = when (state) {
-        is AgentState.Idle -> VoidColor.TextDisabled
-        is AgentState.Running -> VoidColor.Cyan
-        is AgentState.Done -> VoidColor.Green
-        is AgentState.Error -> VoidColor.Red
-    }
-
-    Row(
-        modifier = Modifier.height(28.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = when (state) {
-                is AgentState.Idle -> "_ ready for command"
-                is AgentState.Running -> "◉ $stepText"
-                is AgentState.Done -> "✓ done in $stepText"
-                is AgentState.Error -> "✗ $stepText"
-                else -> ""
-            },
-            style = TextStyle(
-                fontFamily = FontFamily.Monospace,
-                fontSize = 11.sp,
-                color = textColor
-            )
-        )
-
-        if (state is AgentState.Idle) {
-            Box(
-                modifier = Modifier
-                    .width(1.dp)
-                    .height(12.dp)
-                    .background(VoidColor.TextDisabled.copy(alpha = cursorAlpha))
-            )
-        }
-    }
-}
-
-@Composable
-private fun InputRowWithVoice(
-    commandText: String,
-    onCommandTextChange: (String) -> Unit,
-    placeholderText: String,
-    voiceState: VoiceState,
-    onVoicePressStart: () -> Unit,
-    onVoicePressEnd: () -> Unit,
-    onSend: () -> Unit
-) {
-    val isRecording = voiceState is VoiceState.Recording
-    val isTranscribing = voiceState is VoiceState.Transcribing
-
-    val scale by animateFloatAsState(
-        targetValue = if (isRecording) 1.15f else 1f,
-        animationSpec = spring(stiffness = 400f, dampingRatio = 0.5f),
-        label = "mic_scale"
-    )
-
-    val glowAlpha by animateFloatAsState(
-        targetValue = if (isRecording) 0.6f else 0f,
-        animationSpec = tween(200),
-        label = "mic_glow"
-    )
-
-    val bgColor by animateColorAsState(
-        targetValue = when {
-            isRecording -> VoidColor.Red
-            isTranscribing -> VoidColor.Amber
-            else -> VoidColor.Void700
-        },
-        animationSpec = tween(200),
-        label = "mic_bg"
-    )
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .scale(scale)
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onPress = {
-                            onVoicePressStart()
-                            tryAwaitRelease()
-                            onVoicePressEnd()
-                        }
-                    )
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            if (glowAlpha > 0f) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(
-                            color = VoidColor.Red.copy(alpha = glowAlpha * 0.3f),
-                            shape = CircleShape
-                        )
-                )
-            }
-
-            Surface(
-                shape = CircleShape,
-                color = bgColor,
-                modifier = Modifier.size(36.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Mic,
-                        contentDescription = "Voice input",
-                        tint = Color.White,
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .size(18.dp)
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Text(
-            text = "›",
-            style = TextStyle(
-                fontFamily = FontFamily.Monospace,
-                fontSize = 18.sp,
-                color = VoidColor.Violet
-            )
-        )
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        BasicTextField(
-            value = commandText,
-            onValueChange = onCommandTextChange,
-            modifier = Modifier.weight(1f),
-            textStyle = TextStyle(
-                fontFamily = FontFamily.Monospace,
-                fontSize = 14.sp,
-                color = VoidColor.TextPrimary
-            ),
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.None,
-                autoCorrect = false,
-                keyboardType = KeyboardType.Text,
-                imeAction = ImeAction.Send
-            ),
-            keyboardActions = KeyboardActions(onSend = { onSend() }),
-            decorationBox = { innerTextField ->
-                Box {
-                    if (commandText.isEmpty()) {
-                        Text(
-                            text = placeholderText,
-                            style = TextStyle(
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 14.sp,
-                                color = VoidColor.TextDisabled.copy(alpha = 0.5f)
-                            )
-                        )
-                    }
-                    innerTextField()
-                }
-            }
-        )
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        val sendButtonColor = if (commandText.isEmpty()) VoidColor.Void700 else VoidColor.Violet
-
-        Surface(
-            modifier = Modifier.size(36.dp),
-            shape = RoundedCornerShape(8.dp),
-            color = sendButtonColor,
-            onClick = onSend
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowUp,
-                    contentDescription = "Send",
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun DividerLine() {
-    Divider(
-        modifier = Modifier.fillMaxWidth(),
-        thickness = 1.dp,
-        color = VoidColor.Void600
-    )
-}
-
-@Composable
-private fun TaskLogWidget(tasks: List<TaskNode>) {
-    Column(modifier = Modifier.heightIn(max = 80.dp)) {
-        tasks.forEachIndexed { index, task ->
-            var visible by remember { mutableStateOf(false) }
-
-            LaunchedEffect(Unit) {
-                delay((index * 80).toLong())
-                visible = true
-            }
-
-            AnimatedVisibility(
-                visible = visible,
-                enter = slideInVertically { -24 } + fadeIn()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(32.dp)
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .background(
-                                color = if (task.result.contains("Error") || task.result.contains("Failed"))
-                                    VoidColor.Red else VoidColor.Green,
-                                shape = RoundedCornerShape(3.dp)
-                            )
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Text(
-                        text = task.command,
-                        style = TextStyle(
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            color = VoidColor.TextDisabled
-                        ),
-                        maxLines = 1
-                    )
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    Text(
-                        text = formatRelativeTime(task.timestamp),
-                        style = TextStyle(
-                            fontFamily = FontFamily.Default,
-                            fontSize = 10.sp,
-                            color = VoidColor.TextDisabled
-                        )
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun formatRelativeTime(timestamp: Long): String {
-    val diff = System.currentTimeMillis() - timestamp
-    val minutes = diff / 60000
-    return when {
-        minutes < 1 -> "now"
-        minutes < 60 -> "${minutes}m"
-        else -> "${minutes / 60}h"
-    }
-}
-
-@Composable
-private fun SuggestionChips(
-    suggestions: List<String>,
-    onSuggestionClick: (String) -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        suggestions.forEachIndexed { index, suggestion ->
-            var visible by remember { mutableStateOf(false) }
-
-            LaunchedEffect(Unit) {
-                delay(index * 60L)
-                visible = true
-            }
-
-            AnimatedVisibility(
-                visible = visible,
-                enter = fadeIn(animationSpec = tween(200)) +
-                    slideInHorizontally(
-                        initialOffsetX = { -it },
-                        animationSpec = tween(200)
-                    )
-            ) {
-                Surface(
-                    modifier = Modifier
-                        .clickable { onSuggestionClick(suggestion) },
-                    shape = RoundedCornerShape(16.dp),
-                    color = VoidColor.Void700
-                ) {
-                    Text(
-                        text = suggestion,
-                        style = TextStyle(
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            color = VoidColor.TextSecondary
-                        ),
-                        modifier = Modifier.padding(
-                            horizontal = 12.dp,
-                            vertical = 6.dp
-                        )
-                    )
-                }
             }
         }
     }
