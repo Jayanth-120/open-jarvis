@@ -119,7 +119,6 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_CONFIDENCE_THRESHOLD, 0.1f)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, SILENCE_TIMEOUT_MS)
         }
 
@@ -136,11 +135,11 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
     override fun stop(): String? {
         _isListening.value = false
         recognizer?.stopListening()
-        
+
         audioRecord?.stop()
         audioRecord?.release()
         audioRecord = null
-        
+
         val result = pendingResult
         pendingResult = null
         currentCallback = null
@@ -157,14 +156,13 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
         scope.cancel()
     }
 
-    // Push-to-talk: start audio capture manually (for VAD mode)
     fun startAudioCapture(): Boolean {
         val bufferSize = AudioRecord.getMinBufferSize(
             SAMPLE_RATE,
             AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT
         )
-        
+
         return try {
             audioRecord = AudioRecord(
                 MediaRecorder.AudioSource.MIC,
@@ -181,7 +179,6 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
         }
     }
 
-    // Capture audio with VAD
     suspend fun captureWithVAD(): FloatArray = withContext(Dispatchers.IO) {
         val bufferSize = AudioRecord.getMinBufferSize(
             SAMPLE_RATE,
@@ -200,7 +197,6 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
 
             allSamples.addAll(shortBuffer.take(read))
 
-            // Simple VAD: check max amplitude
             val amplitude = shortBuffer.take(read).maxOfOrNull { kotlin.math.abs(it.toInt()) } ?: 0
             if (amplitude < SILENCE_THRESHOLD) {
                 if (silenceStartTime < 0) silenceStartTime = System.currentTimeMillis()
