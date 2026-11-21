@@ -302,6 +302,91 @@ RULES:
         return null
     }
 }
+ val label = action.label
+                    if (label != null) {
+                        val packageName = findPackageByLabel(label)
+                        if (packageName != null) {
+                            JarvisAccessibilityService.instance?.openAppByPackage(packageName)
+                            graphifyRepo.logAppOpened(packageName, label)
+                        } else {
+                            _state.value = AgentState.Error("App not found: $label")
+                            return
+                        }
+                    }
+                }
+                Action.TAP -> {
+                    action.text?.let { text ->
+                        JarvisAccessibilityService.instance?.tapByText(text)
+                    }
+                }
+                Action.TYPE -> {
+                    action.value?.let { value ->
+                        JarvisAccessibilityService.instance?.typeText(value)
+                    }
+                }
+                Action.PRESS_BACK -> {
+                    JarvisAccessibilityService.instance?.pressBack()
+                }
+                Action.PRESS_HOME -> {
+                    JarvisAccessibilityService.instance?.pressHome()
+                }
+                Action.PRESS_RECENTS -> {
+                    JarvisAccessibilityService.instance?.pressRecents()
+                }
+                Action.AI_PROMPT -> {
+                    val packageName = action.packageName
+                    val prompt = workingMemory.interpolate(action.prompt ?: "")
+                    val outputKey = action.outputKey
+
+                    if (packageName != null) {
+                        val meta = AIApps.KNOWN_AI_APPS[packageName]
+                        if (meta != null) {
+                            aiAppInteractor.openAIApp(meta)
+                            kotlinx.coroutines.delay(2000)
+                            aiAppInteractor.typePrompt(prompt)
+                            kotlinx.coroutines.delay(1000)
+                            val response = aiAppInteractor.waitForResponse()
+                            if (outputKey != null) {
+                                workingMemory.set(outputKey, response)
+                            }
+                        }
+                    }
+                }
+                Action.EXTRACT_TEXT -> {
+                    val outputKey = action.outputKey ?: "page_text"
+                    val text = screenReader.extractAllText()
+                    workingMemory.set(outputKey, text)
+                }
+                Action.ERROR -> {
+                    _state.value = AgentState.Error(action.message ?: "Task failed")
+                    return
+                }
+            }
+
+            kotlinx.coroutines.delay(500)
+        }
+    }
+
+    private fun findPackageByLabel(label: String): String? {
+        val pm = context.packageManager
+        val intent = Intent(Intent.ACTION_MAIN, null).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+        }
+
+        val apps: List<ResolveInfo> = pm.queryIntentActivities(intent, 0)
+
+        val normalizedLabel = label.lowercase().trim()
+
+        for (app in apps) {
+            val appLabel = app.loadLabel(pm).toString().lowercase()
+            if (appLabel == normalizedLabel || appLabel.contains(normalizedLabel) || normalizedLabel.contains(appLabel)) {
+                return app.activityInfo.packageName
+            }
+        }
+
+        return null
+    }
+}
 s.size}")
             
             when (action.action) {
