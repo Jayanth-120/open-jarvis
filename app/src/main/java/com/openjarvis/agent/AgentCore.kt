@@ -7,13 +7,11 @@ import com.openjarvis.accessibility.JarvisAccessibilityService
 import com.openjarvis.accessibility.ScreenReader
 import com.openjarvis.graphify.AnalysisEngine
 import com.openjarvis.graphify.GraphifyRepository
-import com.openjarvis.intelligence.AIAppInteractor
 import com.openjarvis.intelligence.AIApps
 import com.openjarvis.intelligence.AppAnalyzer
 import com.openjarvis.intelligence.TaskRouter
 import com.openjarvis.intelligence.TaskWorkingMemory
 import com.openjarvis.llm.UniversalAdapter
-import com.openjarvis.vision.VisionModule
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,10 +27,8 @@ class AgentCore(private val context: Context) {
     private val analysisEngine = AnalysisEngine(context)
     private val universalAdapter = UniversalAdapter(context)
     private val screenReader = ScreenReader(context)
-    private val visionModule = VisionModule.getInstance(context)
     private val taskRouter = TaskRouter(context)
     private val appAnalyzer = AppAnalyzer(context)
-    private val aiAppInteractor = AIAppInteractor(context)
     private var workingMemory = TaskWorkingMemory()
     private val scope = CoroutineScope(Dispatchers.IO)
     private val taskMutex = Mutex()
@@ -91,7 +87,7 @@ RULES:
                     when (sanitized) {
                         is PromptSanitizer.SanitizeResult.Rejected -> {
                             _state.value = AgentState.Error(sanitized.reason)
-                            return@taskMutex.withLock
+                            return@withLock
                         }
                         is PromptSanitizer.SanitizeResult.Suspicious -> {
                             _state.value = AgentState.Running("analyzing...")
@@ -254,16 +250,11 @@ RULES:
                     val outputKey = action.outputKey
 
                     if (packageName != null) {
-                        val meta = AIApps.KNOWN_AI_APPS[packageName]
-                        if (meta != null) {
-                            aiAppInteractor.openAIApp(meta)
-                            kotlinx.coroutines.delay(2000)
-                            aiAppInteractor.typePrompt(prompt)
-                            kotlinx.coroutines.delay(1000)
-                            val response = aiAppInteractor.waitForResponse()
-                            if (outputKey != null) {
-                                workingMemory.set(outputKey, response)
-                            }
+                        JarvisAccessibilityService.instance?.openAppByPackage(packageName)
+                        kotlinx.coroutines.delay(1500)
+                        JarvisAccessibilityService.instance?.typeText(prompt)
+                        if (outputKey != null) {
+                            workingMemory.set(outputKey, prompt)
                         }
                     }
                 }
