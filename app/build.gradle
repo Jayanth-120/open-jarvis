@@ -21,14 +21,23 @@ android {
 
     sourceSets {
         main {
-            java {
-                exclude 'com/openjarvis/bridge/**'
-                exclude 'com/openjarvis/builder/**'
-                exclude 'com/openjarvis/local/**'
-                exclude 'com/openjarvis/skills/**'
-                exclude 'com/openjarvis/mcp/**'
-                exclude 'com/openjarvis/intelligence/JarvisNotificationListener.kt'
-            }
+            kotlin.srcDirs += ['src/main/java']
+            kotlin.exclude(
+                'com/openjarvis/bridge/**',
+                'com/openjarvis/builder/**',
+                'com/openjarvis/local/**',
+                'com/openjarvis/skills/**',
+                'com/openjarvis/mcp/**',
+                'com/openjarvis/intelligence/JarvisNotificationListener.kt'
+            )
+            java.exclude(
+                'com/openjarvis/bridge/**',
+                'com/openjarvis/builder/**',
+                'com/openjarvis/local/**',
+                'com/openjarvis/skills/**',
+                'com/openjarvis/mcp/**',
+                'com/openjarvis/intelligence/JarvisNotificationListener.kt'
+            )
         }
     }
 
