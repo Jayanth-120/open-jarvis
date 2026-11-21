@@ -1,6 +1,5 @@
 package com.openjarvis.llm.providers
 
-import com.openjarvis.llm.ConnectionResult
 import com.openjarvis.llm.HttpClient
 import com.openjarvis.llm.LLMProvider
 import kotlinx.coroutines.Dispatchers

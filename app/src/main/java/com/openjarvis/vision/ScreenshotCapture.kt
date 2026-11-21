@@ -68,21 +68,21 @@ class ScreenshotCapture(private val context: Context) {
     fun capture(): Bitmap? {
         if (!isCapturing || imageReader == null) return null
 
-        val surface = imageReader?.surface ?: return null
+        val reader = imageReader ?: return null
+        val surface = reader.surface
         
         try {
             mediaProjection?.createVirtualDisplay(
                 "Screenshot",
-                surface.width,
-                surface.height,
-                surface.allocation,
-                surface.allocation,
+                reader.width,
+                reader.height,
+                context.resources.displayMetrics.densityDpi,
                 surface,
                 null,
                 handler
             )
 
-            val image = imageReader?.acquireLatestImage()
+            val image = reader.acquireLatestImage()
             return image?.let { img ->
                 val planes = img.planes
                 val buffer: ByteBuffer = planes[0].buffer

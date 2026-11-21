@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -174,6 +175,92 @@ fun FloatingOverlayWidget(
                 onClick = { isExpanded = true },
                 modifier = modifier
             )
+        }
+    }
+}
+
+@Composable
+private fun StatusOrb(state: AgentState) {
+    val color = when (state) {
+        is AgentState.Idle -> VoidColor.Violet
+        is AgentState.Running -> VoidColor.Cyan
+        is AgentState.Done -> VoidColor.Green
+        is AgentState.Error -> VoidColor.Red
+    }
+    Canvas(Modifier.size(10.dp)) { drawCircle(color) }
+}
+
+@Composable
+private fun StatusLine(state: AgentState, stepText: String) {
+    val label = when (state) {
+        is AgentState.Idle -> "Ready for a command"
+        is AgentState.Running -> stepText.ifBlank { "Working..." }
+        is AgentState.Done -> stepText.ifBlank { "Task complete" }
+        is AgentState.Error -> stepText.ifBlank { "Task failed" }
+    }
+    Text(label, color = VoidColor.TextSecondary, fontSize = 12.sp)
+}
+
+@Composable
+private fun DividerLine() {
+    Divider(color = VoidColor.BorderSubtle, thickness = 1.dp)
+}
+
+@Composable
+private fun SuggestionChips(suggestions: List<String>, onSuggestionClick: (String) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        suggestions.take(3).forEach { suggestion ->
+            Surface(
+                modifier = Modifier.clickable { onSuggestionClick(suggestion) },
+                color = VoidColor.Void800,
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(suggestion, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    color = VoidColor.TextSecondary, fontSize = 11.sp, maxLines = 1)
+            }
+        }
+    }
+}
+
+@Composable
+private fun InputRowWithVoice(
+    commandText: String,
+    onCommandTextChange: (String) -> Unit,
+    placeholderText: String,
+    voiceState: VoiceState,
+    onVoicePressStart: () -> Unit,
+    onVoicePressEnd: () -> Unit,
+    onSend: () -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        BasicTextField(
+            value = commandText,
+            onValueChange = onCommandTextChange,
+            modifier = Modifier.weight(1f).padding(12.dp),
+            textStyle = TextStyle(color = VoidColor.TextPrimary, fontSize = 14.sp),
+            decorationBox = { inner ->
+                if (commandText.isEmpty()) Text(placeholderText, color = VoidColor.TextDisabled)
+                inner()
+            },
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Send),
+            keyboardActions = KeyboardActions(onSend = { onSend() })
+        )
+        IconButton(onClick = {
+            if (voiceState is VoiceState.Recording) onVoicePressEnd() else onVoicePressStart()
+        }) {
+            Icon(Icons.Default.Mic, contentDescription = "Voice input", tint = VoidColor.Violet)
+        }
+        IconButton(onClick = onSend, enabled = commandText.isNotBlank()) {
+            Icon(Icons.Default.Send, contentDescription = "Send command", tint = VoidColor.Violet)
+        }
+    }
+}
+
+@Composable
+private fun TaskLogWidget(tasks: List<TaskNode>) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        tasks.forEach { task ->
+            Text(task.command, color = VoidColor.TextSecondary, fontSize = 11.sp, maxLines = 1)
         }
     }
 }

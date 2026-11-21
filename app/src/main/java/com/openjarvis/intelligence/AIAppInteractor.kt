@@ -1,24 +1,23 @@
 package com.openjarvis.intelligence
 
-import android.content.Context
 import com.openjarvis.accessibility.JarvisAccessibilityService
 import com.openjarvis.accessibility.ScreenReader
 import kotlinx.coroutines.delay
 
-class AIAppInteractor(private val context: Context) {
+class AIAppInteractor(private val service: JarvisAccessibilityService) {
 
-    private val screenReader = ScreenReader(context)
+    private val screenReader = ScreenReader(service)
 
-    suspend fun openAIApp(appInfo: AIApps.AIAppInfo): Boolean {
-        val service = JarvisAccessibilityService.instance ?: return false
-        service.openAppByPackage(appInfo.packageName)
+    suspend fun openAIApp(appInfo: AIAppMeta): Boolean {
+        val activeService = JarvisAccessibilityService.instance ?: return false
+        activeService.openAppByPackage(appInfo.packageName)
         delay(1500)
         return true
     }
 
     suspend fun typePrompt(prompt: String): Boolean {
-        val service = JarvisAccessibilityService.instance ?: return false
-        val typed = service.typeText(prompt)
+        val activeService = JarvisAccessibilityService.instance ?: return false
+        val typed = activeService.typeText(prompt)
         delay(500)
         return typed
     }
