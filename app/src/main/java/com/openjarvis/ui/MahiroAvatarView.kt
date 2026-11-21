@@ -1,4 +1,4 @@
-package com.openjarvis.service
+package com.openjarvis.ui
 
 import android.content.Context
 import android.graphics.Color
