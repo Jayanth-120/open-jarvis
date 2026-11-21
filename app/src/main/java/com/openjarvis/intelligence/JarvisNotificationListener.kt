@@ -1,16 +1,24 @@
 package com.openjarvis.intelligence
 
 import android.app.Notification
-import android.content.pm.PackageManager
+import android.speech.tts.TextToSpeech
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.openjarvis.accessibility.JarvisAccessibilityService
+import com.openjarvis.ui.MahiruPersona
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import java.util.Locale
 
 class JarvisNotificationListener : NotificationListenerService() {
     
     private val notifications = mutableListOf<JarvisNotification>()
+    private var announcer: TextToSpeech? = null
     
     companion object {
+        private val _alerts = MutableStateFlow<List<JarvisNotification>>(emptyList())
+        val alerts = _alerts.asStateFlow()
+
         private val PRIVACY_PROTECTED_APPS = setOf(
             "com.google.android.apps.nbu.paisa.user",
             "com.phonepe.app",
@@ -46,19 +54,59 @@ class JarvisNotificationListener : NotificationListenerService() {
             "com.discord"
         )
     }
+
+    override fun onCreate() {
+        super.onCreate()
+        announcer = TextToSpeech(applicationContext) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                announcer?.language = Locale.getDefault()
+                announcer?.let(MahiruPersona::configureVoice)
+            }
+        }
+    }
+
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        val current = activeNotifications.orEmpty()
+            .filter { it.packageName != packageName && !it.isOngoing && !it.isGroup }
+            .filter { shouldProcessNotification(it.packageName) }
+            .map(::parseNotification)
+            .takeLast(20)
+        synchronized(notifications) {
+            notifications.clear()
+            notifications.addAll(current)
+            _alerts.value = current.asReversed()
+        }
+    }
     
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        if (!shouldProcessNotification(sbn.packageName)) {
+        if (sbn.packageName == packageName || sbn.isOngoing || sbn.isGroup || !shouldProcessNotification(sbn.packageName)) {
             return
         }
         
         val parsed = parseNotification(sbn)
-        notifications.add(parsed)
+        synchronized(notifications) {
+            notifications.removeAll { it.packageName == parsed.packageName && it.id == parsed.id }
+            notifications.add(parsed)
+            while (notifications.size > 20) notifications.removeAt(0)
+            _alerts.value = notifications.toList().asReversed()
+        }
+        announce(parsed)
         
     }
     
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
-        notifications.removeAll { it.id == sbn.id }
+        // Preserve a short recent-alert history after the system notification is dismissed.
+    }
+
+    private fun announce(alert: JarvisNotification) {
+        val detail = listOf(alert.title, alert.body).filter { it.isNotBlank() }.joinToString(": ")
+        val message = when {
+            alert.category == Notification.CATEGORY_CALL -> "Incoming call${detail.takeIf { it.isNotBlank() }?.let { " from $it" } ?: ""}."
+            alert.isMessaging -> "New message${alert.sender?.let { " from $it" } ?: ""}${detail.takeIf { it.isNotBlank() }?.let { ": $it" } ?: ""}."
+            else -> "Notification from ${alert.appLabel}${detail.takeIf { it.isNotBlank() }?.let { ": $it" } ?: ""}."
+        }
+        announcer?.speak(message, TextToSpeech.QUEUE_ADD, null, "mahiru-${alert.id}-${alert.timestamp}")
     }
     
     private fun parseNotification(sbn: StatusBarNotification): JarvisNotification {
@@ -88,15 +136,16 @@ class JarvisNotificationListener : NotificationListenerService() {
             body = body,
             timestamp = sbn.postTime,
             isMessaging = isMessaging,
-            sender = sender
+            sender = sender,
+            category = sbn.notification.category
         )
     }
     
     suspend fun replyToNotification(sender: String, packageName: String, reply: String): Boolean {
         return try {
-            val notification = notifications.find {
+            val notification = synchronized(notifications) { notifications.find {
                 it.packageName == packageName && it.sender?.contains(sender, ignoreCase = true) == true
-            } ?: return false
+            } } ?: return false
             
             val service = JarvisAccessibilityService.instance
             
@@ -111,15 +160,14 @@ class JarvisNotificationListener : NotificationListenerService() {
     }
     
     fun getUnread(packageName: String? = null): List<JarvisNotification> {
-        return if (packageName != null) {
-            notifications.filter { it.packageName == packageName }
-        } else {
-            notifications.toList()
+        return synchronized(notifications) {
+            if (packageName != null) notifications.filter { it.packageName == packageName }
+            else notifications.toList()
         }
     }
     
     fun getSummary(): String {
-        val grouped = notifications.groupBy { it.packageName }
+        val grouped = synchronized(notifications) { notifications.groupBy { it.packageName } }
         
         return grouped.entries.sortedByDescending { it.value.size }.take(5).joinToString(", ") { (pkg, msgs) ->
             val app = msgs.first().appLabel
@@ -132,10 +180,23 @@ class JarvisNotificationListener : NotificationListenerService() {
     
     fun clearAll(packageName: String? = null) {
         if (packageName != null) {
-            notifications.removeAll { it.packageName == packageName }
+            synchronized(notifications) {
+                notifications.removeAll { it.packageName == packageName }
+                _alerts.value = notifications.toList().asReversed()
+            }
         } else {
-            notifications.clear()
+            synchronized(notifications) {
+                notifications.clear()
+                _alerts.value = emptyList()
+            }
         }
+    }
+
+    override fun onDestroy() {
+        announcer?.stop()
+        announcer?.shutdown()
+        announcer = null
+        super.onDestroy()
     }
     
     data class JarvisNotification(
@@ -146,7 +207,8 @@ class JarvisNotificationListener : NotificationListenerService() {
         val body: String,
         val timestamp: Long,
         val isMessaging: Boolean,
-        val sender: String?
+        val sender: String?,
+        val category: String?
     )
     
 }

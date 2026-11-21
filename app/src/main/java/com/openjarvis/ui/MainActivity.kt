@@ -35,6 +35,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.openjarvis.accessibility.JarvisAccessibilityService
 import com.openjarvis.agent.AgentCore
 import com.openjarvis.agent.AgentState
+import com.openjarvis.intelligence.JarvisNotificationListener
 import com.openjarvis.ui.theme.VoidColor
 import com.openjarvis.ui.theme.OpenJarvisTheme
 import com.openjarvis.voice.VoiceManager
@@ -67,6 +68,7 @@ class MainActivity : ComponentActivity() {
             OpenJarvisTheme {
                 val agentState by agentCore.state.collectAsState()
                 val voiceState by voiceManager.state.collectAsState()
+                val alerts by JarvisNotificationListener.alerts.collectAsState()
 
                 LaunchedEffect(voiceState) {
                     val result = voiceState as? VoiceManager.VoiceState.Result
@@ -91,7 +93,9 @@ class MainActivity : ComponentActivity() {
                         onSend = { command -> agentCore.executeTask(command) },
                         onMicClick = ::requestVoiceInput,
                         onStopVoice = { voiceManager.stopListening() },
-                        onOpenSettings = { startActivity(Intent(this, SettingsActivity::class.java)) }
+                        onOpenSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
+                        alerts = alerts,
+                        onNotificationAccess = { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
                     )
                 }
             }

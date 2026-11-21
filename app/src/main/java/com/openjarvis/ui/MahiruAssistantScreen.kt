@@ -3,12 +3,12 @@ package com.openjarvis.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,6 +16,14 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +32,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -40,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -58,12 +68,21 @@ fun MahiruAssistantScreen(
     onSend: (String) -> Unit,
     onMicClick: () -> Unit,
     onStopVoice: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    alerts: List<com.openjarvis.intelligence.JarvisNotificationListener.JarvisNotification>,
+    onNotificationAccess: () -> Unit
 ) {
     var command by remember { mutableStateOf("") }
     val listening = voiceState is VoiceManager.VoiceState.Recording ||
         voiceState is VoiceManager.VoiceState.Transcribing
     val avatarAction = rememberUpdatedState(if (listening) onStopVoice else onMicClick)
+    val orbit = rememberInfiniteTransition(label = "hologram-orbit")
+    val orbitRotation by orbit.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(18000, easing = LinearEasing), RepeatMode.Restart),
+        label = "orbit-rotation"
+    )
     val status = when (agentState) {
         is AgentState.Idle -> when (voiceState) {
             is VoiceManager.VoiceState.Error -> voiceState.message
@@ -115,6 +134,9 @@ fun MahiruAssistantScreen(
                 IconButton(onClick = onOpenSettings) {
                     Icon(Icons.Default.Settings, contentDescription = "Settings", tint = VoidColor.TextSecondary)
                 }
+                IconButton(onClick = onNotificationAccess) {
+                    Icon(Icons.Default.NotificationsActive, contentDescription = "Notification access", tint = VoidColor.Cyan)
+                }
             }
 
             Box(
@@ -131,6 +153,21 @@ fun MahiruAssistantScreen(
                         .fillMaxSize()
                         .clickable { avatarAction.value() }
                 )
+                Canvas(Modifier.fillMaxSize()) {
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+                    val radius = size.minDimension * 0.43f
+                    drawCircle(Color(0x335FEAFF), radius, androidx.compose.ui.geometry.Offset(cx, cy), style = Stroke(1.dp.toPx()))
+                    drawArc(Color(0xCC7AEAFF), orbitRotation, 78f, false,
+                        topLeft = androidx.compose.ui.geometry.Offset(cx - radius * 1.12f, cy - radius * 1.12f),
+                        size = androidx.compose.ui.geometry.Size(radius * 2.24f, radius * 2.24f),
+                        style = Stroke(2.dp.toPx()))
+                    drawArc(Color(0xAA9A78FF), -orbitRotation * 0.72f, 112f, false,
+                        topLeft = androidx.compose.ui.geometry.Offset(cx - radius * 1.27f, cy - radius * 0.80f),
+                        size = androidx.compose.ui.geometry.Size(radius * 2.54f, radius * 1.60f),
+                        style = Stroke(1.5.dp.toPx()))
+                    drawCircle(Color(0xFF7AEAFF), 3.dp.toPx(), androidx.compose.ui.geometry.Offset(cx + radius * kotlin.math.cos(Math.toRadians(orbitRotation.toDouble())).toFloat(), cy + radius * kotlin.math.sin(Math.toRadians(orbitRotation.toDouble())).toFloat()))
+                }
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -143,6 +180,18 @@ fun MahiruAssistantScreen(
             }
 
             Text(status, color = if (agentState is AgentState.Error || voiceState is VoiceManager.VoiceState.Error) VoidColor.Red else VoidColor.TextSecondary, fontSize = 13.sp)
+            if (alerts.isEmpty()) {
+                Text("ALERT LINK  ·  enable notification access", color = VoidColor.Cyan.copy(alpha = 0.72f), fontSize = 10.sp, letterSpacing = 1.sp, modifier = Modifier.clickable(onClick = onNotificationAccess).padding(top = 7.dp))
+            } else {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(top = 7.dp, bottom = 2.dp)) {
+                    items(alerts.take(5)) { alert ->
+                        Column(Modifier.border(1.dp, VoidColor.BorderGlow, RoundedCornerShape(12.dp)).background(Color(0xAA101522), RoundedCornerShape(12.dp)).padding(horizontal = 11.dp, vertical = 8.dp)) {
+                            Text("${alert.appLabel.uppercase()}  ·  ${alert.title.ifBlank { "ALERT" }}", color = VoidColor.Cyan, fontSize = 10.sp, maxLines = 1)
+                            Text(alert.body.ifBlank { "New activity" }, color = Color.White.copy(alpha = 0.84f), fontSize = 11.sp, maxLines = 1)
+                        }
+                    }
+                }
+            }
             Spacer(Modifier.height(10.dp))
 
             Surface(
