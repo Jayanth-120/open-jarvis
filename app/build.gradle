@@ -28,9 +28,9 @@ android {
                 'com/openjarvis/local/**',
                 'com/openjarvis/skills/**',
                 'com/openjarvis/mcp/**',
-                'com/openjarvis/intelligence/JarvisNotificationListener.kt'
+                'com/openjarvis/intelligence/JarvisNotificationListener.kt',
                 'com/openjarvis/vision/ScreenshotCapture.kt',
-                'com/openjarvis/vision/VisionModule.kt',
+                'com/openjarvis/vision/VisionModule.kt'
             )
             java.exclude(
                 'com/openjarvis/bridge/**',
@@ -38,10 +38,9 @@ android {
                 'com/openjarvis/local/**',
                 'com/openjarvis/skills/**',
                 'com/openjarvis/mcp/**',
-                'com/openjarvis/intelligence/JarvisNotificationListener.kt'
+                'com/openjarvis/intelligence/JarvisNotificationListener.kt',
                 'com/openjarvis/vision/ScreenshotCapture.kt',
-                'com/openjarvis/vision/VisionModule.kt',
-                
+                'com/openjarvis/vision/VisionModule.kt'
             )
         }
     }
