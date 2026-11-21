@@ -3,6 +3,7 @@ package com.openjarvis.vision
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.hardware.display.DisplayManager
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.media.ImageReader
@@ -77,6 +78,7 @@ class ScreenshotCapture(private val context: Context) {
                 reader.width,
                 reader.height,
                 context.resources.displayMetrics.densityDpi,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                 surface,
                 null,
                 handler

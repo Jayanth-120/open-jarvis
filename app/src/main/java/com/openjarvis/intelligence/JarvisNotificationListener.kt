@@ -5,15 +5,9 @@ import android.content.pm.PackageManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.openjarvis.accessibility.JarvisAccessibilityService
-import com.openjarvis.graphify.GraphifyRepository
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 class JarvisNotificationListener : NotificationListenerService() {
     
-    private val scope = CoroutineScope(Dispatchers.IO)
-    private var graphifyRepo: GraphifyRepository? = null
     private val notifications = mutableListOf<JarvisNotification>()
     
     companion object {
@@ -61,13 +55,6 @@ class JarvisNotificationListener : NotificationListenerService() {
         val parsed = parseNotification(sbn)
         notifications.add(parsed)
         
-        scope.launch {
-            try {
-                graphifyRepo?.logNotification(
-                    "${parsed.packageName}: ${parsed.title}"
-                )
-            } catch (e: Exception) { }
-        }
     }
     
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
@@ -90,7 +77,7 @@ class JarvisNotificationListener : NotificationListenerService() {
         val isMessaging = sbn.packageName in messagingApps
         
         val sender = if (isMessaging) {
-            extras.getCharSequence(Notification.EXTRA_SENDER_TEXT)?.toString()
+            title.takeIf { it.isNotBlank() }
         } else null
         
         return JarvisNotification(
