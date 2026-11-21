@@ -1,83 +1,97 @@
 package com.openjarvis.ui
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Intent
-import android.net.Uri
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.openjarvis.accessibility.JarvisAccessibilityService
-import com.openjarvis.graphify.GraphifyRepository
-import com.openjarvis.graphify.nodes.TaskNode
-import com.openjarvis.ui.dashboard.DashboardScreen
-import com.openjarvis.ui.theme.OpenJarvisTheme
+import com.openjarvis.agent.AgentCore
+import com.openjarvis.agent.AgentState
 import com.openjarvis.ui.theme.VoidColor
+import com.openjarvis.ui.theme.OpenJarvisTheme
+import com.openjarvis.voice.VoiceManager
 
 class MainActivity : ComponentActivity() {
 
-    private lateinit var graphifyRepo: GraphifyRepository
+    private lateinit var agentCore: AgentCore
+    private lateinit var voiceManager: VoiceManager
     private var accessibilityAllowed by mutableStateOf(false)
-    private var overlayAllowed by mutableStateOf(false)
+
+    private val requestMicrophone = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) startVoiceInput()
+        else Toast.makeText(this, "Microphone permission is needed for voice chat.", Toast.LENGTH_LONG).show()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        hideSystemBars()
 
-        graphifyRepo = GraphifyRepository(this)
+        // Shut down the old floating-window mode so it cannot cover the full-screen assistant.
+        stopService(Intent(this, OverlayService::class.java))
+
+        agentCore = AgentCore(this)
+        voiceManager = VoiceManager(this)
+        accessibilityAllowed = isAccessibilityServiceEnabled()
 
         setContent {
             OpenJarvisTheme {
-                var recentTasks by remember { mutableStateOf<List<TaskNode>>(emptyList()) }
+                val agentState by agentCore.state.collectAsState()
+                val voiceState by voiceManager.state.collectAsState()
 
-                LaunchedEffect(Unit) {
-                    try {
-                        recentTasks = graphifyRepo.getRecentTasks(10)
-                    } catch (_: Exception) {
+                LaunchedEffect(voiceState) {
+                    val result = voiceState as? VoiceManager.VoiceState.Result
+                    if (result != null) {
+                        agentCore.executeTask(result.text)
+                        voiceManager.resetState()
                     }
                 }
+                LaunchedEffect(agentState) {
+                    if (agentState is AgentState.Done) voiceManager.speak("I'm done. What else can I help with?")
+                }
 
-                val accessibilityEnabled = accessibilityAllowed
-                val overlayEnabled = overlayAllowed
-
-                if (!accessibilityEnabled || !overlayEnabled) {
+                if (!accessibilityAllowed) {
                     PermissionScreen(
-                        accessibilityEnabled = accessibilityEnabled,
-                        overlayEnabled = overlayEnabled,
-                        onEnableAccessibility = { startAccessibilitySettings() },
-                        onEnableOverlay = { startOverlaySettings() }
+                        accessibilityEnabled = false,
+                        onEnableAccessibility = { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
                     )
                 } else {
-                    DashboardScreen(
-                        onStartOverlay = { startOverlayService() },
-                        onOpenSettings = { openSettings() },
-                        graphifyRepo = graphifyRepo,
-                        modifier = Modifier.fillMaxSize()
+                    MahiruAssistantScreen(
+                        agentState = agentState,
+                        voiceState = voiceState,
+                        onSend = { command -> agentCore.executeTask(command) },
+                        onMicClick = ::requestVoiceInput,
+                        onStopVoice = { voiceManager.stopListening() },
+                        onOpenSettings = { startActivity(Intent(this, SettingsActivity::class.java)) }
                     )
                 }
             }
@@ -87,7 +101,37 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         accessibilityAllowed = isAccessibilityServiceEnabled()
-        overlayAllowed = Settings.canDrawOverlays(this)
+        hideSystemBars()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideSystemBars()
+    }
+
+    override fun onDestroy() {
+        if (::voiceManager.isInitialized) voiceManager.release()
+        super.onDestroy()
+    }
+
+    private fun hideSystemBars() {
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    private fun requestVoiceInput() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            startVoiceInput()
+        } else {
+            requestMicrophone.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun startVoiceInput() {
+        voiceManager.setVoiceEnabled(true)
+        voiceManager.startListening()
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
@@ -95,91 +139,32 @@ class MainActivity : ComponentActivity() {
             contentResolver,
             Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
         ) ?: return false
-
         val expected = ComponentName(this, JarvisAccessibilityService::class.java)
         return enabledServices.split(':').any { ComponentName.unflattenFromString(it) == expected }
     }
-
-    private fun startAccessibilitySettings() {
-        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-    }
-
-    private fun startOverlaySettings() {
-        startActivity(
-            Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:$packageName")
-            )
-        )
-    }
-
-    private fun startOverlayService() {
-        OverlayService.start(this)
-        Toast.makeText(this, "Mahiru is active", Toast.LENGTH_SHORT).show()
-    }
-
-    private fun openSettings() {
-        startActivity(Intent(this, SettingsActivity::class.java))
-    }
 }
 
-@Composable
-fun PermissionScreen(
+@androidx.compose.runtime.Composable
+private fun PermissionScreen(
     accessibilityEnabled: Boolean,
-    overlayEnabled: Boolean,
-    onEnableAccessibility: () -> Unit,
-    onEnableOverlay: () -> Unit
+    onEnableAccessibility: () -> Unit
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        Text("One permission to begin", style = MaterialTheme.typography.headlineSmall, color = VoidColor.TextPrimary)
         Text(
-            text = "Permission Required",
-            style = MaterialTheme.typography.headlineMedium,
-            color = VoidColor.TextPrimary
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "Mahiru needs accessibility and overlay permissions to control your device.",
-            style = MaterialTheme.typography.bodyMedium,
+            "Mahiru needs Accessibility access to interact with apps on your device.",
+            modifier = Modifier.padding(vertical = 16.dp),
             color = VoidColor.TextSecondary,
             textAlign = TextAlign.Center
         )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
         if (!accessibilityEnabled) {
-            Button(
-                onClick = onEnableAccessibility,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Enable Accessibility Service")
+            Button(onClick = onEnableAccessibility, modifier = Modifier.fillMaxWidth()) {
+                Text("Enable Accessibility")
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        if (!overlayEnabled) {
-            Button(
-                onClick = onEnableOverlay,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Enable Overlay Permission")
-            }
-        }
-
-        if (accessibilityEnabled && overlayEnabled) {
-            Text(
-                text = "Mahiru is ready",
-                style = MaterialTheme.typography.titleMedium,
-                color = VoidColor.Violet
-            )
         }
     }
 }

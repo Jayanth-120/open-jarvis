@@ -17,9 +17,8 @@ class MahiruAvatarView(
     private var downX = 0f
     private var downY = 0f
 
-        private val sceneView = SceneView(context).apply {
+    private val sceneView = SceneView(context).apply {
         setBackgroundColor(Color.TRANSPARENT)
-        setZOrderOnTop(true)
     }
 
     init {
