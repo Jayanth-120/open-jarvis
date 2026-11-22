@@ -109,7 +109,7 @@ class MainActivity : ComponentActivity() {
                         alerts = alerts,
                         onNotificationAccess = { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) },
                         wakeWordEnabled = wakeWordActive,
-                        onWakeWordToggle = ::setWakeWordEnabled
+                        onWakeWordToggle = ::updateWakeWordMode
                     )
                 }
             }
@@ -153,7 +153,7 @@ class MainActivity : ComponentActivity() {
         voiceManager.startListening()
     }
 
-    private fun setWakeWordEnabled(enabled: Boolean) {
+    private fun updateWakeWordMode(enabled: Boolean) {
         if (!enabled) {
             disableWakeWord()
             return
